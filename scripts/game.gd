@@ -228,6 +228,7 @@ var _q: Array = []
 # Director
 var spawn_budget := 0.0
 var next_event := 0
+var event_times: Array[float] = []
 
 # Finger
 var joy_id := -1
@@ -323,6 +324,11 @@ func _setup_stats() -> void:
 	card_count = 3 + Save.shop_level("choice")
 	light = max_light
 	xp_needed = _xp_for(1)
+	# Every night shifts its events a little, so the timetable can't be memorised. Order never changes.
+	var last := 0.0
+	for ev in EVENTS:
+		last = maxf(last + 5.0, float(ev[0]) + randf_range(-12.0, 12.0))
+		event_times.append(minf(last, NIGHT_LENGTH - 20.0))
 
 
 func _xp_for(l: int) -> float:
@@ -627,7 +633,7 @@ func _update_camera(dt: float) -> void:
 
 func _update_light(dt: float) -> void:
 	# Light slowly burns away, so standing still is never safe.
-	var drain: float = (0.38 + t * 0.0012) * modifier.drain
+	var drain: float = (0.56 + t * 0.0026) * modifier.drain
 	if not finished: light -= drain * dt
 	light = minf(light, max_light)
 	var frac := clampf(light / max_light, 0.0, 1.0)
@@ -637,7 +643,7 @@ func _update_light(dt: float) -> void:
 
 	if not headless and not finished:
 		# The last 40 seconds, the night slowly lifts.
-		var lift := clampf((t - (NIGHT_LENGTH - 40.0)) / 40.0, 0.0, 1.0)
+		var lift := clampf((t - (NIGHT_LENGTH - 15.0)) / 15.0, 0.0, 1.0)
 		dark_strength = 0.965 - lift * 0.42
 		dawn_glow.color.a = lift * 0.13
 
@@ -661,7 +667,7 @@ func _update_light(dt: float) -> void:
 func hurt(amount: float) -> void:
 	if i_frames > 0.0 or finished: return
 	light -= amount
-	i_frames = 0.7
+	i_frames = 0.4
 	shake = maxf(shake, 7.0)
 	Sound.play("hurt", 1.0, 0.1)
 	if not headless:
@@ -673,11 +679,11 @@ func hurt(amount: float) -> void:
 
 func _run_director(dt: float) -> void:
 	if finished: return
-	while next_event < EVENTS.size() and t >= EVENTS[next_event][0]:
+	while next_event < EVENTS.size() and t >= event_times[next_event]:
 		_fire_event(EVENTS[next_event])
 		next_event += 1
 	var base := 2.0 + t * 0.055 + pow(t / 100.0, 2.0) * 1.2
-	spawn_budget += base * modifier.spawn * dt
+	spawn_budget += base * 1.35 * modifier.spawn * dt
 	while spawn_budget >= 1.0:
 		spawn_budget -= 1.0
 		if enemies.size() >= enemy_cap:
@@ -747,11 +753,12 @@ func spawn(kind: int, pos: Vector2, forced_elite := false) -> Enemy:
 	e.timer = randf_range(0.5, 2.2)
 	e.phase = randf_range(0.0, 6.28)
 	e.r = d[0]
-	e.speed = d[2] * modifier.espeed * (1.0 + t / 900.0)
-	e.dmg = d[3] * (1.0 + t / 400.0)
+	e.speed = d[2] * modifier.espeed * (1.12 + t / 450.0)
+	e.dmg = d[3] * (1.25 + t / 280.0)
 	e.xp = d[4]
-	e.hp = d[1] * modifier.hp if e.is_boss else d[1] * hp_scale
-	e.elite = forced_elite or (not e.is_boss and t > 50.0 and randf() < 0.016 * luck)
+	# Bosses grow with the player, so an over-levelled flame still gets a real fight.
+	e.hp = d[1] * modifier.hp * (1.0 + 0.04 * maxi(0, level - 10)) if e.is_boss else d[1] * hp_scale
+	e.elite = forced_elite or (not e.is_boss and t > 50.0 and randf() < 0.04 * luck)
 	if e.elite:
 		e.hp *= 6.0
 		e.r *= 1.4
@@ -832,26 +839,28 @@ func _update_enemies(dt: float) -> void:
 				elif dist < 290.0: move = Vector2.ZERO
 				e.timer -= dt
 				if e.timer <= 0.0 and dist < 520.0:
-					e.timer = randf_range(2.2, 3.2)
-					_shoot_enemy_bullet(e.pos, dir, 185.0, e.dmg)
+					e.timer = randf_range(1.2, 1.8)
+					# Aim a little ahead of a moving flame, so running in a straight line no longer dodges.
+					var lead := p + move_dir * speed_stat * (dist / 215.0) * 0.6
+					_shoot_enemy_bullet(e.pos, (lead - e.pos).normalized(), 215.0, e.dmg)
 					Sound.play("spit", 0.6)
 			Data.BOMBER:
 				if e.fuse >= 0.0:
 					move = Vector2.ZERO
 					e.fuse -= dt
-					e.sc = 1.0 + (1.0 - e.fuse / 0.55) * 0.55
+					e.sc = 1.0 + (1.0 - e.fuse / 0.42) * 0.55
 					e.flash = 0.9 if int(e.fuse * 16.0) % 2 == 0 else 0.1
 					if e.fuse <= 0.0:
 						e.alive = false
 						_explode(e.pos, 92.0, 15.0 + t / 28.0)
 						continue
-				elif dist < 76.0:
-					e.fuse = 0.55
+				elif dist < 90.0:
+					e.fuse = 0.42
 			Data.BOSS1, Data.BOSS2:
 				e.timer -= dt
 				if e.timer <= 0.0:
 					var first := e.kind == Data.BOSS1
-					e.timer = 3.0 if first else 2.3
+					e.timer = 2.0 if first else 1.4
 					var count := 12 if first else 18
 					var off := randf()
 					for i in count:
@@ -952,7 +961,7 @@ func _kill(e: Enemy) -> void:
 	# Drops. Big drops come in clusters so that collecting them plays the rising ember melody.
 	if e.is_boss:
 		bosses_killed += 1
-		picked_stardust += 25
+		picked_stardust += 60
 		hit_stop = 0.14
 		shake = 16.0
 		Sound.play("bossdie", 1.0, 0.0)
@@ -964,7 +973,7 @@ func _kill(e: Enemy) -> void:
 	if e.kind == Data.BLOB:
 		for i in 2: spawn(Data.MINI, e.pos + Vector2(randf_range(-14, 14), randf_range(-14, 14)))
 	if e.elite:
-		drop_ember(EMBER_DUST, 5, e.pos)
+		drop_ember(EMBER_DUST, 12, e.pos)
 		drop_ember(EMBER_BIG, 5, e.pos + Vector2(randf_range(-14, 14), randf_range(-14, 14)))
 		drop_ember(EMBER_HEART, 1, e.pos + Vector2(randf_range(-14, 14), randf_range(-14, 14)))
 		return
@@ -1011,7 +1020,7 @@ func _update_embers(dt: float) -> void:
 		var to := p - m.pos
 		var d := to.length()
 		# Embers left behind eventually come to you, so a kill far away in the dark is never wasted.
-		if not m.pulled and (m.age > 6.0 or d < (magnet * 1.5 if m.kind == EMBER_HEART else magnet)): m.pulled = true
+		if not m.pulled and (m.age > 9.0 or d < (magnet * 1.5 if m.kind == EMBER_HEART else magnet)): m.pulled = true
 		if m.pulled:
 			m.vel = m.vel * keep + (to / maxf(d, 0.001)) * (1400.0 * dt)
 		else:
@@ -1032,7 +1041,7 @@ func _collect(m: Ember) -> void:
 			Sound.play("ember%d" % mini(ember_combo, 7), 0.8, 0.03)
 			ember_combo += 1
 		EMBER_HEART:
-			light = minf(max_light, light + 28.0)
+			light = minf(max_light, light + 22.0)
 			Sound.play("revive", 0.6, 0.1)
 			if not headless: float_text("+ light", p + Vector2(0, -34), Palette.GOLD, 22)
 		EMBER_DUST:
@@ -1645,7 +1654,7 @@ func _reach_dawn() -> void:
 
 
 func score() -> int:
-	return kills * 10 + int(t) * 5 + level * 50 + bosses_killed * 500 + (5000 if won else 0)
+	return kills * 10 + int(t) * 5 + level * 50 + bosses_killed * 1000 + (5000 if won else 0)
 
 
 func earned_stardust() -> int:
@@ -1796,7 +1805,7 @@ func _roll_options() -> Array:
 		picks.append(pool[index])
 		pool.remove_at(index)
 	# When light is low, always give a way out of the death spiral.
-	if light / max_light < 0.35 and not picks.is_empty(): picks[-1] = "warm"
+	if light / max_light < 0.25 and not picks.is_empty(): picks[-1] = "warm"
 	if picks.is_empty(): picks = ["warm"]
 	return picks
 
@@ -1871,7 +1880,7 @@ func _make_card(o: String, w: float, h: float) -> GButton:
 	card.radius = 20
 	var icon := "warm"
 	var name := "Warm Up"
-	var desc := "Instantly restore 40 light."
+	var desc := "Instantly restore 22 light."
 	var lvl := 0
 	var max_level := 0
 	var tag := "RESCUE"
@@ -1925,7 +1934,7 @@ func _make_card(o: String, w: float, h: float) -> GButton:
 func choose_option(o: String) -> void:
 	if o.begins_with("w."): grant_weapon(o.substr(2))
 	elif o.begins_with("p."): apply_passive(o.substr(2))
-	else: light = minf(max_light, light + 40.0)
+	else: light = minf(max_light, light + 22.0)
 	if headless:
 		state = State.PLAYING
 		return
