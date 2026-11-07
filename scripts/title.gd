@@ -10,7 +10,7 @@ var tagline := Txt.make("Keep your little light alive until dawn.", 18, Palette.
 var hint := Txt.make("Touch and drag anywhere to move. Your flame shoots by itself.", 16, Palette.MUTED)
 var stats := Txt.make("", 15, Palette.MUTED)
 var dust := Txt.make("", 24, Palette.VIOLET, 1)
-var credit := Txt.make("v1.3 · Made with Godot · Fonts and icons: Nunito, Noto", 13, Palette.MUTED)
+var credit := Txt.make("v1.3.1 · Made with Godot · Fonts and icons: Nunito, Noto", 13, Palette.MUTED)
 var left_arrow: GButton
 var right_arrow: GButton
 var play_button: GButton

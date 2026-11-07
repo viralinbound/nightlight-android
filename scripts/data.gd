@@ -49,10 +49,10 @@ static func weapon_blurb(w: String, level: int) -> String:
 			return "More damage."
 		"moths": return "Moths circle you and bite what they touch." if level == 1 else "One more moth, and more bite."
 		"nova": return "A ring of fire that shoves everything away." if level == 1 else "Bigger, stronger and more often."
-		"fireflies": return "Homing fireflies hunt shadows for you." if level == 1 else "More fireflies, faster."
+		"fireflies": return "Homing fireflies hunt shadows for you." if level == 1 else "Faster, and one more firefly every other level."
 		"trail": return "You leave burning embers where you walk." if level == 1 else "Hotter embers that last longer."
 		"zap": return "Lightning jumps between shadows." if level == 1 else "Jumps further and hits harder."
-		"starfall": return "Stars crash down on random shadows." if level == 1 else "More stars, bigger impact."
+		"starfall": return "Stars crash down on random shadows." if level == 1 else "Bigger impact, and one more star every other level."
 	return ""
 
 
@@ -82,8 +82,8 @@ const SHOP := [
 	{"id": "flame", "icon": "soul", "name": "Thicker Wick", "blurb": "+8 max light every run", "max": 5, "cost": 30},
 	{"id": "power", "icon": "sharp", "name": "Hotter Sparks", "blurb": "+6% damage every run", "max": 5, "cost": 40},
 	{"id": "feet", "icon": "feet", "name": "Light Steps", "blurb": "+4% move speed every run", "max": 5, "cost": 30},
-	{"id": "wisdom", "icon": "wisdom", "name": "Old Stories", "blurb": "+8% ember value every run", "max": 5, "cost": 40},
-	{"id": "reroll", "icon": "reroll", "name": "Lucky Dice", "blurb": "+1 reroll of upgrade cards", "max": 3, "cost": 60},
+	{"id": "wisdom", "icon": "wisdom", "name": "Old Stories", "blurb": "+8% XP every run", "max": 5, "cost": 40},
+	{"id": "reroll", "icon": "reroll", "name": "Lucky Dice", "blurb": "+1 card reroll per run", "max": 3, "cost": 60},
 	{"id": "choice", "icon": "choice", "name": "Fourth Card", "blurb": "Choose from 4 upgrades, not 3", "max": 1, "cost": 300},
 ]
 

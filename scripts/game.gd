@@ -758,7 +758,7 @@ func spawn(kind: int, pos: Vector2, forced_elite := false) -> Enemy:
 	e.xp = d[4]
 	# Bosses grow with the player, so an over-levelled flame still gets a real fight.
 	e.hp = d[1] * modifier.hp * (1.0 + 0.04 * maxi(0, level - 10)) if e.is_boss else d[1] * hp_scale
-	e.elite = forced_elite or (not e.is_boss and t > 50.0 and randf() < 0.04 * luck)
+	e.elite = forced_elite or (not e.is_boss and t > 50.0 and randf() < 0.04)
 	if e.elite:
 		e.hp *= 6.0
 		e.r *= 1.4
@@ -1155,19 +1155,18 @@ func _fire_weapon(w: String, l: int) -> bool:
 				_draw_beam(from, current.pos)
 				from = current.pos
 				damage(current, dmg, Vector2.INF, 0.0)
-				current = nearest_enemy(from, 200.0 * area, seen)
+				current = nearest_enemy(from, 200.0 * area * (1.0 + l * 0.1), seen)
 				jumps -= 1
 			Sound.play("zap", 0.8, 0.08)
 		"starfall":
 			var count := 1 + l / 2
-			var fired := false
 			var reach := _target_range() * 1.4
 			var picks := enemies.filter(func(e): return e.alive and e.pos.distance_to(p) < reach)
 			if picks.is_empty(): return false
+			picks.shuffle()
 			for i in count:
-				_add_star(picks.pick_random().pos, 16.0 + l * 6.5, 58.0 * area * (1.0 + l * 0.06))
-				fired = true
-			return fired
+				_add_star(picks[i % picks.size()].pos, 16.0 + l * 6.5, 58.0 * area * (1.0 + l * 0.06))
+			return true
 		_:
 			return false
 	return true
@@ -1209,7 +1208,7 @@ func _update_projectiles(dt: float) -> void:
 
 
 func _update_moths(dt: float, l: int) -> void:
-	moth_angle += dt * 3.1
+	moth_angle += dt * 3.1 / cooldown_mul
 	var radius := (82.0 + l * 5.0) * area
 	var dmg := 4.0 + l * 1.8
 	var hit_r := 18.0 * area
@@ -1220,7 +1219,7 @@ func _update_moths(dt: float, l: int) -> void:
 			if not e.alive or e.moth_tick > 0.0: continue
 			var reach := e.r + hit_r
 			if pos.distance_squared_to(e.pos) < reach * reach:
-				e.moth_tick = 0.32
+				e.moth_tick = 0.32 * cooldown_mul
 				damage(e, dmg, p, 90.0)
 
 
@@ -1273,7 +1272,7 @@ func _update_patches(dt: float) -> void:
 			if not e.alive or e.patch_tick > 0.0: continue
 			var reach := e.r + q.r * 0.8
 			if q.pos.distance_squared_to(e.pos) < reach * reach:
-				e.patch_tick = 0.38
+				e.patch_tick = 0.38 * cooldown_mul
 				damage(e, q.dmg, Vector2.INF, 0.0)
 		if q.life <= 0.0:
 			patches[i] = patches[-1]
@@ -1805,7 +1804,9 @@ func _roll_options() -> Array:
 		picks.append(pool[index])
 		pool.remove_at(index)
 	# When light is low, always give a way out of the death spiral.
-	if light / max_light < 0.25 and not picks.is_empty(): picks[-1] = "warm"
+	if light / max_light < 0.25 and not picks.is_empty():
+		if picks.size() < 4: picks.append("warm")
+		else: picks[-1] = "warm"
 	if picks.is_empty(): picks = ["warm"]
 	return picks
 
@@ -1857,7 +1858,7 @@ func _show_cards() -> void:
 		tw.tween_interval(i * 0.05)
 		tw.tween_property(card, "modulate:a", 1.0, 0.12)
 		tw.parallel().tween_property(card, "scale", Vector2.ONE, 0.14)
-	if rerolls > 0:
+	if rerolls > 0 and current_options != ["warm"]:
 		var r := GButton.make("Reroll (%d)" % rerolls, 220, 54, 19, reroll_cards)
 		r.position = Vector2(0, 228)
 		var ic := BaseScene.icon_node("reroll", 26)

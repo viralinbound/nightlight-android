@@ -243,7 +243,7 @@ func start(shot_dir: String, _playthrough := false) -> void:
 	g.resume()
 
 	# Boss.
-	g.t = 124.9
+	g.t = g.event_times[3] - 0.1   # boss time shifts a little every night
 	g.next_event = 3
 	g.light = g.max_light
 	await _wait(0.4)
